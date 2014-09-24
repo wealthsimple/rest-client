@@ -694,6 +694,28 @@ describe RestClient::Request, :include_helpers do
       RestClient::Request.new(:method => :get, :url => 'http://user:password@url', :headers => {:user_agent => 'rest-client'}).log_request
       expect(log[0]).to eq %Q{RestClient.get "http://user:REDACTED@url", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client"\n}
     end
+
+    context "log_verbosity is set to :verbose" do
+      before(:each) { RestClient.log_verbosity = :verbose }
+      after(:each) { RestClient.log_verbosity = nil }
+      let!(:log) { RestClient.log = [] }
+
+      it "logs a response with a body" do
+        res = double('result', :code => '200', :class => Net::HTTPOK, :body => %Q{{"some": "json"}})
+        allow(res).to receive(:[]).with('Content-type').and_return('application/json; charset=utf-8')
+        @request.log_response res
+        expect(log[0]).to eq "# => 200 OK | application/json 16 bytes\n"
+        expect(log[1]).to eq %Q{# => {"some": "json"}}
+      end
+
+      it "logs a response with a nil body" do
+        res = double('result', :code => '200', :class => Net::HTTPOK, :body => nil)
+        allow(res).to receive(:[]).with('Content-type').and_return('text/html; charset=utf-8')
+        @request.log_response res
+        expect(log[0]).to eq "# => 200 OK | text/html 0 bytes\n"
+        expect(log[1]).to eq %Q{# => nil}
+      end
+    end
   end
 
   it "strips the charset from the response content type" do
