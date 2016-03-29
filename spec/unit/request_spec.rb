@@ -695,6 +695,28 @@ describe RestClient::Request, :include_helpers do
       expect(log[0]).to eq %Q{RestClient.get "http://user:REDACTED@url", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client"\n}
     end
 
+    context "log_response_body_for_content_types is set to ['application/json', 'text/plain']" do
+      before(:each) { RestClient.log_response_body_for_content_types = ['application/json', 'text/plain'] }
+      let!(:log) { RestClient.log = [] }
+
+      it "logs a response with Content-Type=application/json" do
+        res = double('result', :code => '200', :class => Net::HTTPOK, :body => %Q{{"some": "json"}})
+        allow(res).to receive(:[]).with('Content-type').and_return('application/json; charset=utf-8')
+        @request.log_response res
+        expect(log.size).to eq 2
+        expect(log[0]).to eq "# => 200 OK | application/json 16 bytes\n"
+        expect(log[1]).to eq %Q{# => {"some": "json"}}
+      end
+
+      it "does not log a response with Content-Type=text/html" do
+        res = double('result', :code => '200', :class => Net::HTTPOK, :body => nil)
+        allow(res).to receive(:[]).with('Content-type').and_return('text/html; charset=utf-8')
+        @request.log_response res
+        expect(log.size).to eq 1
+        expect(log[0]).to eq "# => 200 OK | text/html 0 bytes\n"
+      end
+    end
+
     context "log_verbosity is set to :verbose" do
       before(:each) { RestClient.log_verbosity = :verbose }
       after(:each) { RestClient.log_verbosity = nil }

@@ -122,6 +122,11 @@ module RestClient
     @@log_verbosity = verbosity
   end
 
+  def self.log_response_body_for_content_types= content_types
+    content_types = [content_types]  if content_types.is_a?(String)
+    @@log_response_body_for_content_types = content_types
+  end
+
   # Create a log that respond to << like a logger
   # param can be 'stdout', 'stderr', a string (then we will log to that file) or a logger (then we return it)
   def self.create_log param
@@ -163,6 +168,7 @@ module RestClient
 
   @@log = nil
   @@log_verbosity = :default
+  @@log_response_body_for_content_types = []
 
   def self.log # :nodoc:
     @@env_log || @@log
@@ -170,6 +176,10 @@ module RestClient
 
   def self.log_verbosity
     @@log_verbosity
+  end
+
+  def self.log_response_body_for_content_types
+    @@log_response_body_for_content_types
   end
 
   @@before_execution_procs = []
