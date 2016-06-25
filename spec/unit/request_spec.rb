@@ -702,6 +702,7 @@ describe RestClient::Request, :include_helpers do
       it "logs a response with Content-Type=application/json" do
         res = double('result', :code => '200', :class => Net::HTTPOK, :body => %Q{{"some": "json"}})
         allow(res).to receive(:[]).with('Content-type').and_return('application/json; charset=utf-8')
+        allow(res).to receive(:[]).with('content-encoding').and_return(nil)
         @request.log_response res
         expect(log.size).to eq 2
         expect(log[0]).to eq "# => 200 OK | application/json 16 bytes\n"
@@ -725,6 +726,7 @@ describe RestClient::Request, :include_helpers do
       it "logs a response with a body" do
         res = double('result', :code => '200', :class => Net::HTTPOK, :body => %Q{{"some": "json"}})
         allow(res).to receive(:[]).with('Content-type').and_return('application/json; charset=utf-8')
+        allow(res).to receive(:[]).with('content-encoding').and_return(nil)
         @request.log_response res
         expect(log[0]).to eq "# => 200 OK | application/json 16 bytes\n"
         expect(log[1]).to eq %Q{# => {"some": "json"}}
@@ -733,9 +735,19 @@ describe RestClient::Request, :include_helpers do
       it "logs a response with a nil body" do
         res = double('result', :code => '200', :class => Net::HTTPOK, :body => nil)
         allow(res).to receive(:[]).with('Content-type').and_return('text/html; charset=utf-8')
+        allow(res).to receive(:[]).with('content-encoding').and_return(nil)
         @request.log_response res
         expect(log[0]).to eq "# => 200 OK | text/html 0 bytes\n"
         expect(log[1]).to eq %Q{# => nil}
+      end
+
+      it "does not log responses that have been gzipped" do
+        res = double('result', :code => '200', :class => Net::HTTPOK, :body => %Q{���})
+        allow(res).to receive(:[]).with('Content-type').and_return('application/json; charset=utf-8')
+        allow(res).to receive(:[]).with('content-encoding').and_return('gzip')
+        @request.log_response res
+        expect(log[0]).to eq "# => 200 OK | application/json 3 bytes\n"
+        expect(log[1]).to eq %Q{# => <gzipped>}
       end
     end
   end
