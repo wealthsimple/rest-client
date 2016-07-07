@@ -501,7 +501,7 @@ describe RestClient::Request do
       end
     end
 
-    context 'when log filters are set', :focus do
+    context 'when log filters are set' do
       before(:each) do
         RestClient.log_filters << [/("some"\:\s*)"(?:\\+"|[^"])*"/, '\1"***"']
         RestClient.log_verbosity = :verbose
