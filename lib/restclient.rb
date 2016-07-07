@@ -54,7 +54,7 @@ require File.dirname(__FILE__) + '/restclient/windows'
 #
 #   RestClient.proxy = ENV['http_proxy']
 #
-# To specify LOG filters, use the log_filters property:
+# To specify log filters, use the log_filters property:
 #
 #   RestClient.log_filters << [/(abc)/,'\1def']
 #

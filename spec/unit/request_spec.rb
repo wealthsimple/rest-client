@@ -512,7 +512,7 @@ describe RestClient::Request do
       end
       let!(:log) { RestClient.log = [] }
 
-      it 'logs a filtered request' do
+      it 'logs a request with a filtered body' do
         request = RestClient::Request.new(:method => :post, :url => 'http://url', :content_type => :json, :payload => %Q{{"some": "json"}})
         request.log_request
         log[0].should eq %Q{RestClient.post "http://url", "{\\"some\\": \\"***\\"}", "Accept"=>"*/*; q=0.5, application/xml", "Accept-Encoding"=>"gzip, deflate", "Content-Length"=>"16"\n}
