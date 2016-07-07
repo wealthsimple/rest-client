@@ -531,7 +531,7 @@ module RestClient
       out = []
 
       out << "RestClient.#{method} #{redacted_url.inspect}"
-      out << payload.short_inspect if payload
+      out << payload.short_inspect(RestClient.log_filters) if payload
       out << processed_headers.to_a.sort.map { |(k, v)| [k.inspect, v.inspect].join("=>") }.join(", ")
       RestClient.log << out.join(', ') + "\n"
     end
@@ -552,7 +552,7 @@ module RestClient
         if res['content-encoding'] == 'gzip'
           RestClient.log << "# => <gzipped>"
         else
-          RestClient.log << "# => #{res.body || 'nil'}"
+          RestClient.log << "# => #{apply_log_filters(res.body, RestClient.log_filters) || 'nil'}"
         end
       end
     end
@@ -822,6 +822,13 @@ module RestClient
 
     def parser
       URI.const_defined?(:Parser) ? URI::Parser.new : URI
+    end
+
+    def apply_log_filters(message, filters)
+      return message  unless message
+      filters.reduce(message) do |current, filter|
+        current.gsub(filter[0], filter[1])
+      end
     end
 
     # Given a MIME type or file extension, return either a MIME type or, if

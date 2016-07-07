@@ -76,12 +76,17 @@ module RestClient
         @stream.close unless @stream.closed?
       end
 
-      def to_s_inspect
-        to_s.inspect
+      def filtered_inspect(filters)
+        @stream.seek(0)
+        result = filters.reduce(read) do |current, filter|
+          current.gsub(filter[0], filter[1])
+        end
+        @stream.seek(0)
+        result.inspect
       end
 
-      def short_inspect
-        (size > 500 ? "#{size} byte(s) length" : to_s_inspect)
+      def short_inspect(filters)
+        (size > 500 ? "#{size} byte(s) length" : filtered_inspect(filters))
       end
 
     end
