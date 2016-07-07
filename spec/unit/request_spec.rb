@@ -500,6 +500,33 @@ describe RestClient::Request do
         log[1].should eq %Q{# => <gzipped>}
       end
     end
+
+    context 'when log filters are set' do
+      before(:each) do
+        RestClient.log_filters << [/("some"\:\s*)"(?:\\+"|[^"])*"/, '\1"***"']
+        RestClient.log_verbosity = :verbose
+      end
+      after(:each) do
+        RestClient.log_verbosity = nil
+        RestClient.log_filters.clear
+      end
+      let!(:log) { RestClient.log = [] }
+
+      it 'logs a request with a filtered body' do
+        request = RestClient::Request.new(:method => :post, :url => 'http://url', :content_type => :json, :payload => %Q{{"some": "json"}})
+        request.log_request
+        log[0].should eq %Q{RestClient.post "http://url", "{\\"some\\": \\"***\\"}", "Accept"=>"*/*; q=0.5, application/xml", "Accept-Encoding"=>"gzip, deflate", "Content-Length"=>"16"\n}
+      end
+
+      it 'logs a response with a filtered body' do
+        res = double('result', :code => '200', :class => Net::HTTPOK, :body => %Q{{"some": "json"}})
+        res.stub(:[]).with('Content-type').and_return('application/json; charset=utf-8')
+        res.stub(:[]).with('content-encoding').and_return(nil)
+        @request.log_response res
+        log[0].should eq "# => 200 OK | application/json 16 bytes\n"
+        log[1].should eq %Q{# => {"some": "***"}}
+      end
+    end
   end
 
   it "strips the charset from the response content type" do
