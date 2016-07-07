@@ -54,6 +54,10 @@ require File.dirname(__FILE__) + '/restclient/windows'
 #
 #   RestClient.proxy = ENV['http_proxy']
 #
+# To specify LOG filters, use the log_filters property:
+#
+#   RestClient.log_filters << [/(abc)/,'\1def']
+#
 # For live tests of RestClient, try using http://rest-test.heroku.com, which echoes back information about the rest call:
 #
 #   >> RestClient.put 'http://rest-test.heroku.com/resource', :foo => 'baz'
@@ -149,11 +153,16 @@ module RestClient
   @@env_log = create_log ENV['RESTCLIENT_LOG']
 
   @@log = nil
+  @@log_filters = []
   @@log_verbosity = :default
   @@log_response_body_for_content_types = []
 
   def self.log # :nodoc:
     @@env_log || @@log
+  end
+
+  def self.log_filters
+    @@log_filters
   end
 
   def self.log_verbosity
