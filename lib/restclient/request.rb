@@ -273,10 +273,8 @@ module RestClient
     end
 
     def net_http_class
-      p_uri = proxy_uri
-
-      if p_uri
-        Net::HTTP::Proxy(p_uri.hostname, p_uri.port, p_uri.user, p_uri.password)
+      if proxy_uri
+        Net::HTTP::Proxy(proxy_uri.hostname, proxy_uri.port, proxy_uri.user, proxy_uri.password)
       else
         Net::HTTP
       end
@@ -358,7 +356,7 @@ module RestClient
 
     def print_verify_callback_warnings
       warned = false
-      if RestClient::Platform.mac?
+      if RestClient::Platform.mac_mri?
         warn('warning: ssl_verify_callback return code is ignored on OS X')
         warned = true
       end
@@ -508,9 +506,9 @@ module RestClient
     def process_result res, & block
       if @raw_response
         # We don't decode raw requests
-        response = RawResponse.new(@tf, res, args)
+        response = RawResponse.new(@tf, res, args, self)
       else
-        response = Response.create(Request.decode(res['content-encoding'], res.body), res, args)
+        response = Response.create(Request.decode(res['content-encoding'], res.body), res, args, self)
       end
 
       if block_given?
@@ -543,7 +541,18 @@ module RestClient
       return unless RestClient.log
 
       out = []
-      out << "RestClient.#{method} #{url.inspect}"
+      sanitized_url = begin
+        uri = URI.parse(url)
+        uri.password = "REDACTED" if uri.password
+        uri.to_s
+      rescue URI::InvalidURIError
+        # An attacker may be able to manipulate the URL to be
+        # invalid, which could force discloure of a password if
+        # we show any of the un-parsed URL here.
+        "[invalid uri]"
+      end
+
+      out << "RestClient.#{method} #{sanitized_url.inspect}"
       out << payload.short_inspect(RestClient.log_filters) if payload
       out << processed_headers.to_a.sort.map { |(k, v)| [k.inspect, v.inspect].join("=>") }.join(", ")
       RestClient.log << out.join(', ') + "\n"
@@ -560,7 +569,7 @@ module RestClient
 
       readable_status = res.class.to_s.gsub(/^Net::HTTP/, '')
       content_type_without_charset = (res['Content-type'] || '').gsub(/;.*$/, '')
-      RestClient.log << "# => #{res.code} #{readable_status} | #{content_type_without_charset} #{size} bytes\n"
+      RestClient.log << "# => #{res.code} #{res.class.to_s.gsub(/^Net::HTTP/, '')} | #{(res['Content-type'] || '').gsub(/;.*$/, '')} #{size} bytes\n"
       if RestClient.log_verbosity == :verbose || RestClient.log_response_body_for_content_types.include?(content_type_without_charset)
         if res['content-encoding'] == 'gzip'
           RestClient.log << "# => <gzipped>"
@@ -577,8 +586,7 @@ module RestClient
           key = key.to_s.split(/_/).map { |w| w.capitalize }.join('-')
         end
         if 'CONTENT-TYPE' == key.upcase
-          target_value = value.to_s
-          result[key] = MIME::Types.type_for_extension target_value
+          result[key] = maybe_convert_extension(value.to_s)
         elsif 'ACCEPT' == key.upcase
           # Accept can be composed of several comma-separated values
           if value.is_a? Array
@@ -586,7 +594,9 @@ module RestClient
           else
             target_values = value.to_s.split ','
           end
-          result[key] = target_values.map { |ext| MIME::Types.type_for_extension(ext.to_s.strip) }.join(', ')
+          result[key] = target_values.map { |ext|
+            maybe_convert_extension(ext.to_s.strip)
+          }.join(', ')
         else
           result[key] = value.to_s
         end
@@ -611,21 +621,38 @@ module RestClient
       end
     end
 
-  end
-end
+    # Given a MIME type or file extension, return either a MIME type or, if
+    # none is found, the input unchanged.
+    #
+    #     >> maybe_convert_extension('json')
+    #     => 'application/json'
+    #
+    #     >> maybe_convert_extension('unknown')
+    #     => 'unknown'
+    #
+    #     >> maybe_convert_extension('application/xml')
+    #     => 'application/xml'
+    #
+    # @param ext [String]
+    #
+    # @return [String]
+    #
+    def maybe_convert_extension(ext)
+      unless ext =~ /\A[a-zA-Z0-9_@-]+\z/
+        # Don't look up strings unless they look like they could be a file
+        # extension known to mime-types.
+        #
+        # There currently isn't any API public way to look up extensions
+        # directly out of MIME::Types, but the type_for() method only strips
+        # off after a period anyway.
+        return ext
+      end
 
-module MIME
-  class Types
-
-    # Return the first found content-type for a value considered as an extension or the value itself
-    def type_for_extension ext
-      candidates = @extension_index[ext]
-      candidates.empty? ? ext : candidates[0].content_type
-    end
-
-    class << self
-      def type_for_extension ext
-        @__types__.type_for_extension ext
+      types = MIME::Types.type_for(ext)
+      if types.empty?
+        ext
+      else
+        types.first.content_type
       end
     end
   end
